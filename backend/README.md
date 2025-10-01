@@ -15,23 +15,23 @@
       InquiryController.php
       HomeController.php
     /models
-      BaseModel.php
+      BaseModel.php               
       UserModel.php
       RoleModel.php
-      EmployeeModel.php
+      EmployeeModel.php           
       ServiceModel.php
       ServiceCategoryModel.php
       ServiceProviderModel.php
-      AppointmentModel.php
-      AppointmentItemModel.php
-      InvoiceModel.php
-      InvoiceItemModel.php
-      PaymentModel.php
-      TempBookingModel.php
+      AppointmentModel.php        
+      AppointmentItemModel.php    
+      InvoiceModel.php            
+      InvoiceItemModel.php        
+      PaymentModel.php            
+      TempBookingModel.php        //to be remove; customer won't have accounts anymore
       VerificationTokenModel.php
       PayrollModel.php
       PayrollItemModel.php
-      AttendanceModel.php
+      AttendanceModel.php         
       LeaveModel.php
       InquiryModel.php
       SiteSettingModel.php
