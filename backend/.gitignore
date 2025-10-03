@@ -41,3 +41,6 @@ storage/framework/views/
 
 # Composer lock (optional, if you don’t want to lock deps)
 # composer.lock
+
+# Ignore test files
+backend/app/services/test.php
