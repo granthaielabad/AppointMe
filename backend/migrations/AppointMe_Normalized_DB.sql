@@ -1,25 +1,36 @@
--- Roles
+-- ================================
+-- ROLES (only for employees/admins)
+-- ================================
 CREATE TABLE tbl_roles (
   id INT AUTO_INCREMENT PRIMARY KEY,
-  name VARCHAR(50) NOT NULL UNIQUE, -- 'customer', 'employee', 'accountant', 'hairstylist', 'pedicurist', 'admin'
+  name VARCHAR(50) NOT NULL UNIQUE, -- 'employee', 'accountant', 'hairstylist', 'pedicurist', 'admin'
   description VARCHAR(255)
 );
 
--- Users (base identity)
+INSERT INTO tbl_roles (name, description) VALUES
+('admin','System Administrator'),
+('employee','General Employee'),
+('accountant','Handles payroll and finances'),
+('hairstylist','Provides hair-related services'),
+('pedicurist','Provides pedicure services');
+
+-- ================================
+-- USERS (employees/admins only)
+-- ================================
 CREATE TABLE tbl_users (
   id INT AUTO_INCREMENT PRIMARY KEY,
-  username VARCHAR(80) NOT NULL UNIQUE, -- email or student number equivalent
+  username VARCHAR(80) NOT NULL UNIQUE,
   email VARCHAR(255) NOT NULL UNIQUE,
   password_hash VARCHAR(255) NOT NULL,
   first_name VARCHAR(100),
   last_name VARCHAR(100),
-  phone_no VARCHAR(11),
+  phone_no VARCHAR(15),
   is_verified TINYINT(1) DEFAULT 0,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME ON UPDATE CURRENT_TIMESTAMP
 );
 
--- Mapping users -> roles (many-to-many allows multiple roles)
+-- Mapping users -> roles
 CREATE TABLE tbl_user_roles (
   user_id INT NOT NULL,
   role_id INT NOT NULL,
@@ -28,39 +39,69 @@ CREATE TABLE tbl_user_roles (
   FOREIGN KEY (role_id) REFERENCES tbl_roles(id) ON DELETE CASCADE
 );
 
--- Employees (profiles tied to users)
+-- ================================
+-- EMPLOYEES
+-- ================================
 CREATE TABLE tbl_employees (
   id INT AUTO_INCREMENT PRIMARY KEY,
   user_id INT NOT NULL UNIQUE,
   employee_code VARCHAR(50) UNIQUE,
   hire_date DATE,
-  position VARCHAR(100), -- free text, also can be derived from role
+  position VARCHAR(100),
   salary_base DECIMAL(12,2) DEFAULT 0.00,
   status ENUM('active','inactive','terminated') DEFAULT 'active',
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (user_id) REFERENCES tbl_users(id) ON DELETE CASCADE
 );
 
--- Service categories
+-- ================================
+-- GUESTS (for bookings)
+-- ================================
+CREATE TABLE tbl_guests (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  full_name VARCHAR(150) NOT NULL,
+  email VARCHAR(255) NOT NULL,
+  phone_no VARCHAR(15) NOT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ================================
+-- SERVICE CATEGORIES
+-- ================================
 CREATE TABLE tbl_service_categories (
   id INT AUTO_INCREMENT PRIMARY KEY,
   name VARCHAR(100) NOT NULL,
   description TEXT
 );
 
--- Services
+INSERT INTO tbl_service_categories (name, description) VALUES
+('Hair Services','Haircut, styling, coloring'),
+('Nail Services','Manicure, pedicure, nail art'),
+('Skin Care','Facials, treatments');
+
+-- ================================
+-- SERVICES
+-- ================================
 CREATE TABLE tbl_services (
   id INT AUTO_INCREMENT PRIMARY KEY,
   category_id INT,
   name VARCHAR(150) NOT NULL,
-  duration_minutes INT NOT NULL, -- for scheduling
+  duration_minutes INT NOT NULL,
   price DECIMAL(12,2) NOT NULL,
   is_active TINYINT(1) DEFAULT 1,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (category_id) REFERENCES tbl_service_categories(id) ON DELETE SET NULL
 );
 
--- Many-to-many: which employees provide which services
+INSERT INTO tbl_services (category_id, name, duration_minutes, price) VALUES
+(1,'Basic Haircut',30,150.00),
+(1,'Hair Coloring',120,800.00),
+(2,'Classic Pedicure',45,200.00),
+(3,'Facial Treatment',60,500.00);
+
+-- ================================
+-- EMPLOYEES -> SERVICES (many-to-many)
+-- ================================
 CREATE TABLE tbl_service_providers (
   service_id INT NOT NULL,
   employee_id INT NOT NULL,
@@ -69,35 +110,44 @@ CREATE TABLE tbl_service_providers (
   FOREIGN KEY (employee_id) REFERENCES tbl_employees(id) ON DELETE CASCADE
 );
 
--- Appointment statuses lookup
+-- ================================
+-- APPOINTMENT STATUSES
+-- ================================
 CREATE TABLE tbl_appointment_statuses (
   id INT AUTO_INCREMENT PRIMARY KEY,
-  code VARCHAR(20) UNIQUE, -- pending, accepted, rejected, completed, cancelled
+  code VARCHAR(20) UNIQUE,
   label VARCHAR(50)
 );
 
 INSERT INTO tbl_appointment_statuses (code,label) VALUES
-('pending','Pending'), ('accepted','Accepted'), ('rejected','Rejected'),
-('completed','Completed'), ('cancelled','Cancelled');
+('pending','Pending'),
+('accepted','Accepted'),
+('rejected','Rejected'),
+('completed','Completed'),
+('cancelled','Cancelled');
 
--- Appointments (one row per booking)
+-- ================================
+-- APPOINTMENTS
+-- ================================
 CREATE TABLE tbl_appointments (
   id INT AUTO_INCREMENT PRIMARY KEY,
-  customer_id INT NOT NULL, -- references users.id
+  guest_id INT NOT NULL,
   appointment_date DATE NOT NULL,
-  appointment_time TIME NOT NULL, -- start time
-  duration_minutes INT NOT NULL, -- total duration (sum of service durations)
-  employee_id INT NULL, -- optional requested employee
+  appointment_time TIME NOT NULL,
+  duration_minutes INT NOT NULL,
+  employee_id INT NULL,
   note TEXT,
-  status_id INT NOT NULL DEFAULT 1, -- pending by default
+  status_id INT NOT NULL DEFAULT 1,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME ON UPDATE CURRENT_TIMESTAMP,
-  FOREIGN KEY (customer_id) REFERENCES tbl_users(id) ON DELETE CASCADE,
+  FOREIGN KEY (guest_id) REFERENCES tbl_guests(id) ON DELETE CASCADE,
   FOREIGN KEY (employee_id) REFERENCES tbl_employees(id) ON DELETE SET NULL,
   FOREIGN KEY (status_id) REFERENCES tbl_appointment_statuses(id) ON DELETE RESTRICT
 );
 
--- Appointment items (services per appointment) -> normalization
+-- ================================
+-- APPOINTMENT ITEMS
+-- ================================
 CREATE TABLE tbl_appointment_items (
   id INT AUTO_INCREMENT PRIMARY KEY,
   appointment_id INT NOT NULL,
@@ -108,11 +158,13 @@ CREATE TABLE tbl_appointment_items (
   FOREIGN KEY (service_id) REFERENCES tbl_services(id) ON DELETE RESTRICT
 );
 
--- Invoices
+-- ================================
+-- INVOICES
+-- ================================
 CREATE TABLE tbl_invoices (
   id INT AUTO_INCREMENT PRIMARY KEY,
-  appointment_id INT NULL UNIQUE, -- optionally linked to an appointment
-  customer_id INT NOT NULL,
+  appointment_id INT NULL UNIQUE,
+  guest_id INT NOT NULL,
   invoice_number VARCHAR(50) NOT NULL UNIQUE,
   subtotal DECIMAL(12,2) NOT NULL,
   tax DECIMAL(12,2) DEFAULT 0.00,
@@ -121,10 +173,12 @@ CREATE TABLE tbl_invoices (
   status ENUM('unpaid','paid','refunded') DEFAULT 'unpaid',
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (appointment_id) REFERENCES tbl_appointments(id) ON DELETE SET NULL,
-  FOREIGN KEY (customer_id) REFERENCES tbl_users(id) ON DELETE CASCADE
+  FOREIGN KEY (guest_id) REFERENCES tbl_guests(id) ON DELETE CASCADE
 );
 
--- Invoice items
+-- ================================
+-- INVOICE ITEMS
+-- ================================
 CREATE TABLE tbl_invoice_items (
   id INT AUTO_INCREMENT PRIMARY KEY,
   invoice_id INT NOT NULL,
@@ -137,18 +191,22 @@ CREATE TABLE tbl_invoice_items (
   FOREIGN KEY (service_id) REFERENCES tbl_services(id) ON DELETE SET NULL
 );
 
--- Payments (for invoices)
+-- ================================
+-- PAYMENTS (GCash only)
+-- ================================
 CREATE TABLE tbl_payments (
   id INT AUTO_INCREMENT PRIMARY KEY,
   invoice_id INT NOT NULL,
   payment_date DATETIME DEFAULT CURRENT_TIMESTAMP,
-  method VARCHAR(50), -- 'cash','card','on-delivery'
+  method ENUM('gcash') DEFAULT 'gcash',
   amount DECIMAL(12,2) NOT NULL,
-  reference VARCHAR(255),
+  reference VARCHAR(255) NOT NULL, -- GCash Ref #
   FOREIGN KEY (invoice_id) REFERENCES tbl_invoices(id) ON DELETE CASCADE
 );
 
--- Attendance
+-- ================================
+-- ATTENDANCE
+-- ================================
 CREATE TABLE tbl_attendance (
   id INT AUTO_INCREMENT PRIMARY KEY,
   employee_id INT NOT NULL,
@@ -160,7 +218,9 @@ CREATE TABLE tbl_attendance (
   UNIQUE(employee_id, date)
 );
 
--- Leaves
+-- ================================
+-- LEAVES
+-- ================================
 CREATE TABLE tbl_leaves (
   id INT AUTO_INCREMENT PRIMARY KEY,
   employee_id INT NOT NULL,
@@ -176,7 +236,9 @@ CREATE TABLE tbl_leaves (
   FOREIGN KEY (reviewer_id) REFERENCES tbl_users(id) ON DELETE SET NULL
 );
 
--- Payrolls (monthly/periodic)
+-- ================================
+-- PAYROLLS
+-- ================================
 CREATE TABLE tbl_payrolls (
   id INT AUTO_INCREMENT PRIMARY KEY,
   employee_id INT NOT NULL,
@@ -191,7 +253,6 @@ CREATE TABLE tbl_payrolls (
   UNIQUE(employee_id, period_start, period_end)
 );
 
--- Payroll items (breakdown)
 CREATE TABLE tbl_payroll_items (
   id INT AUTO_INCREMENT PRIMARY KEY,
   payroll_id INT NOT NULL,
@@ -200,7 +261,9 @@ CREATE TABLE tbl_payroll_items (
   FOREIGN KEY (payroll_id) REFERENCES tbl_payrolls(id) ON DELETE CASCADE
 );
 
--- Inquiries (contact form)
+-- ================================
+-- INQUIRIES
+-- ================================
 CREATE TABLE tbl_inquiries (
   id INT AUTO_INCREMENT PRIMARY KEY,
   name VARCHAR(150),
@@ -211,39 +274,24 @@ CREATE TABLE tbl_inquiries (
   received_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
--- Site settings (About, Contact)
+-- ================================
+-- SITE SETTINGS
+-- ================================
 CREATE TABLE tbl_site_settings (
   id INT AUTO_INCREMENT PRIMARY KEY,
   key_name VARCHAR(100) UNIQUE,
   value TEXT
 );
 
--- Temp bookings (guest prefilled booking persisted until signup/verification)
-CREATE TABLE tbl_temp_bookings (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  token VARCHAR(128) NOT NULL UNIQUE, -- used to associate booking with email session
-  service_ids TEXT, -- JSON array or CSV of service IDs
-  employee_id INT NULL,
-  appointment_date DATE,
-  appointment_time TIME,
-  note TEXT,
-  email VARCHAR(255),
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-);
+INSERT INTO tbl_site_settings (key_name, value) VALUES
+('site_name','8th Avenue Salon'),
+('contact_email','info@8avenuesalon.com'),
+('contact_phone','09171234567'),
+('about_us','Welcome to 8th Avenue Salon, your hub for beauty and relaxation.');
 
--- Verification tokens (email verification, password reset)
-CREATE TABLE tbl_verification_tokens (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  user_id INT NULL,
-  token VARCHAR(128) NOT NULL UNIQUE,
-  type ENUM('email_verify','password_reset') NOT NULL,
-  expires_at DATETIME NOT NULL,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  used TINYINT(1) DEFAULT 0,
-  FOREIGN KEY (user_id) REFERENCES tbl_users(id) ON DELETE CASCADE
-);
-
--- Audit logs (optional)
+-- ================================
+-- AUDIT LOGS
+-- ================================
 CREATE TABLE tbl_audit_logs (
   id INT AUTO_INCREMENT PRIMARY KEY,
   user_id INT NULL,
